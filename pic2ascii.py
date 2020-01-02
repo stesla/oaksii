@@ -34,11 +34,36 @@ import sys
 # to a quirk of the math.
 bwvals = ["|=a","|=b","|=c","|=d","|=e","|=f","|=g","|=h","|=i","|=j","|=k",
           "|=l","|=m","|=n","|=o","|=p","|=q","|=r","|=s","|=t","|=u","|=v",
-          "|=w","|=x","|=y","|=z","|=z"]
+          "|=w","|=x","|=y","|=z"]
 charwidth = 46
 brightness_factor = 1.5
 resize_algorithm = Image.NEAREST
 outputchar = '@'
+
+class Pixel:
+    def __init__(self, r, g, b):
+        self.r, self.g, self.b = r, g, b
+
+    def _repr_(self):
+        return "Pixel(%d, %d, %d)" % (self.r, self.g, self.b)
+
+    # This function checks musifyrgb and calls musifybw if necessary, returning
+    # either the grayscale code or the heximal rgb code
+    # Returns something in format |=i or |345
+    def __str__(self):
+        mr = musifyrgb(self.r)
+        mg = musifyrgb(self.g)
+        mb = musifyrgb(self.b)
+        if mr == mg and mr == mb:
+            rawtotal = self.r + self.g + self.b
+            bwval = int(round((rawtotal+3)/30))
+            return bwvals[bwval]
+        else:
+            return "|%d%d%d" % (mr, mg, mb)
+
+# This function gets called every time to convert from 0-255 values to 0-5 values
+def musifyrgb(raw):
+    return round(raw/51)
 
 # This function opens the file resizes it according to a hard-coded value
 # (currently 50) for width, and returns it as an array of arrays
@@ -50,37 +75,15 @@ def getPixels(filename):
     scaling = charwidth/float(w)
     resized = brighter.resize((charwidth, int(round(scaling*h*6/11))), resize_algorithm)
     w, h = resized.size
-    pix = list(resized.getdata())
+    pix = [Pixel(r, g, b) for (r, g, b) in list(resized.getdata())]
     return [pix[n:n+w] for n in range(0, w*h, w)]
-
-# This function gets called every time to convert from 0-255 values to 0-5 values
-def musifyrgb(raw):
-    return round(raw/51)
-
-# This function only gets called if musifyrgb returns 000,111,222,333,444, or 555
-def musifybw(raw):
-    bwval = int(round((raw+1)/30))
-    return bwvals[bwval]
-
-# This function checks musifyrgb and calls musifybw if necessary, returning
-# either the grayscale code or the heximal rgb code
-# Returns something in format |=i or |345
-def calculateMuseCode(r, g, b):
-    (mr, mg, mb) = (musifyrgb(r), musifyrgb(g), musifyrgb(b))
-    if mr == mg and mr == mb:
-        totalrgb = r + g + b
-        musecode = musifybw(totalrgb)
-    else:
-        musecode = "|%d%d%d" % (mr, mg, mb)
-    return musecode
-
 
 # This returns an array with width elements
 def processRow(row):
     prevcode = ""
     output = []
-    for (r, g, b) in row:
-        currcode = calculateMuseCode(r, g, b)
+    for pixel in row:
+        currcode = str(pixel)
         if currcode == prevcode and currcode != "|=a":
             output.append("")
         else:
@@ -99,7 +102,7 @@ if __name__ == "__main__":
     rows = processImage(getPixels(filename))
     for row in rows:
         for pixel in row:
-            if pixel == "|=a":
+            if str(pixel) == "|=a":
                 print("|_", end='')
             else:
                 print("%s%s" % (pixel, outputchar), end='')
